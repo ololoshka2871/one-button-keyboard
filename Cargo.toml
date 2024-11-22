@@ -1,0 +1,67 @@
+[package]
+authors = ["ololoshka2871"]
+name = "one-button-keyboard"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+embedded-hal = { version = "0.2.7", features = ["unproven"] }
+cortex-m = { version = "0.7", features = ["critical-section-single-core"] }
+cortex-m-rt = "0.7"
+bitflags = "1.3.2"
+lazy_static = { version = "1.5", default-features = false, features = [
+    "spin_no_std",
+] }
+
+stm32f1xx-hal = { version = "0.10.0", features = ["rt", ], optional = true }
+
+rtic = { version = "2.1", features = ["rtic-monotonics"] }
+rtic-monotonics = { version = "2.0.2", features = [
+    "defmt",
+    "cortex-m-systick",
+    "systick-64bit",
+] }
+rtic-sync = { version = "1.0.2", features = ["defmt-03"] }
+
+stm32-usbd = "0.6"
+usb-device = { version = "0.2.9", features = ["defmt", "control-buffer-256"] }
+usbd-hid = { version = "0.6.1" }
+usbd-hid-macros = "0.6.0"
+
+panic-probe = { version = "0.3", default-features = false }
+
+defmt = "0.3"
+defmt-rtt = "0.4"
+
+heapless = "0.8"
+
+stm32-device-signature = "0.3.3"
+
+
+[profile.dev.package."*"]
+opt-level = "z"
+
+[profile.dev]
+opt-level = "z"
+codegen-units = 1 # better optimizations
+lto = false
+panic = "abort"
+
+[profile.release]
+opt-level = "s"
+codegen-units = 1 # better optimizations
+debug = true      # добавлять отладочные символы. Не влияет на размер исполняемого кода, зато работает дебаг
+panic = 'abort'
+lto = true
+
+
+[features]
+default = ["stm32f103c"]
+
+stm32f103c = ["stm32f103"]
+stm32f103 = [
+    "stm32f1xx-hal/stm32f103",
+    "stm32f1xx-hal/medium",
+    "stm32-device-signature/stm32f1",
+    "rtic/thumbv7-backend",
+]
