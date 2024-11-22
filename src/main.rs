@@ -8,8 +8,6 @@ use stm32f1xx_hal::usb::Peripheral;
 
 use stm32_usbd::UsbBus;
 
-use rtic_monotonics::{systick_monotonic, Monotonic};
-
 use stm32f1xx_hal::usb::UsbBusType;
 
 use usbd_hid::descriptor::SerializedDescriptor;
@@ -19,18 +17,6 @@ use defmt_rtt as _; // global logger
 use panic_probe as _;
 
 use rtic::app;
-
-//-----------------------------------------------------------------------------
-
-// Системный таймер
-systick_monotonic!(Mono, config::SYSTICK_RATE_HZ);
-
-//-----------------------------------------------------------------------------
-
-// Добавлять таймштамп для сообщений лога
-defmt::timestamp!("[{=u64:ms}]", Mono::now().ticks());
-
-//-----------------------------------------------------------------------------
 
 #[app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [RTCALARM, FLASH])]
 mod app {

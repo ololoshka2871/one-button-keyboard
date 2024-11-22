@@ -7,8 +7,4 @@ pub const USB_PULLUP_ACTVE_LEVEL: bool = false;
 
 //-----------------------------------------------------------------------------
 
-pub const SYSTICK_RATE_HZ: u32 = 1_000;
-
-//-----------------------------------------------------------------------------
-
-pub const HID_I2C_POLL_INTERVAL_MS: u8 = 10;
+pub const HID_I2C_POLL_INTERVAL_MS: u8 = 50;
