@@ -21,8 +21,6 @@ use rtic::app;
 
 #[app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [RTCALARM, FLASH])]
 mod app {
-    use core::task::Context;
-
     use super::*;
 
     #[shared]
@@ -118,29 +116,34 @@ mod app {
         (Shared { hid, usb_dev }, Local { timer, button })
     }
 
-    #[task(binds = TIM2, shared = [hid], local = [timer, button], priority = 1)]
+    #[task(binds = TIM2, shared = [hid], local = [timer, button, prev_btn_state: bool = false], priority = 1)]
     fn timer_isr(ctx: timer_isr::Context) {
         let timer = ctx.local.timer;
         let button = ctx.local.button;
+        let prev_btn_state = ctx.local.prev_btn_state;
         let mut hid = ctx.shared.hid;
 
         let a = keycode::KeyMap::from(keycode::KeyMappingId::UsA);
 
-        let result = if button.is_high() {
-            [a.usb as u8, 0, 0, 0, 0, 0]
-        } else {
-            [0, 0, 0, 0, 0, 0]
-        };
+        let new_state = button.is_high();
+        if new_state != *prev_btn_state {
+            *prev_btn_state = new_state;
+            let result = if new_state {
+                [a.usb as u8, 0, 0, 0, 0, 0]
+            } else {
+                [0, 0, 0, 0, 0, 0]
+            };
 
-        hid.lock(|hid| {
-            hid.push_input(&usbd_hid::descriptor::KeyboardReport {
-                modifier: 0,
-                reserved: 0,
-                leds: 0,
-                keycodes: result,
+            hid.lock(|hid| {
+                hid.push_input(&usbd_hid::descriptor::KeyboardReport {
+                    modifier: 0,
+                    reserved: 0,
+                    leds: 0,
+                    keycodes: result,
+                })
             })
-        })
-        .ok();
+            .ok();
+        }
 
         timer.clear_interrupt(Event::Update);
     }
@@ -156,20 +159,4 @@ mod app {
             (&mut usb_dev, &mut hid).lock(|usb_dev, hid| usb_dev.poll(&mut [hid]));
         }
     }
-
-    // #[task(binds = USB_HP_CAN_TX, shared = [usb_dev, hid], priority = 4)]
-    // fn usb_tx(ctx: usb_tx::Context) {
-    // let usb_dev = ctx.shared.usb_dev;
-    // let hid = ctx.shared.hid;
-    //
-    // (usb_dev, hid).lock(|usb_dev, hid| usb_dev.poll(&mut [hid]));
-    // }
-    //
-    // #[task(binds = USB_LP_CAN_RX0, shared = [usb_dev, hid], priority = 4)]
-    // fn usb_rx0(ctx: usb_rx0::Context) {
-    // let usb_dev = ctx.shared.usb_dev;
-    // let hid = ctx.shared.hid;
-    //
-    // (usb_dev, hid).lock(|usb_dev, hid| usb_dev.poll(&mut [hid]));
-    // }
 }
