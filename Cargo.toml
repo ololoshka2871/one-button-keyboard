@@ -21,6 +21,8 @@ usbd-hid-macros = "0.6.0"
 
 panic-probe = { version = "0.3", default-features = false }
 
+keycode = "0.4"
+
 defmt = "0.3"
 defmt-rtt = "0.4"
 

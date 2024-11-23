@@ -4,6 +4,7 @@
 mod config;
 
 use stm32f1xx_hal::prelude::*;
+use stm32f1xx_hal::timer::Event;
 use stm32f1xx_hal::usb::Peripheral;
 
 use stm32_usbd::UsbBus;
@@ -20,6 +21,8 @@ use rtic::app;
 
 #[app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [RTCALARM, FLASH])]
 mod app {
+    use core::task::Context;
+
     use super::*;
 
     #[shared]
@@ -29,7 +32,10 @@ mod app {
     }
 
     #[local]
-    struct Local {}
+    struct Local {
+        timer: stm32f1xx_hal::timer::Counter<stm32f1xx_hal::pac::TIM2, 1000>,
+        button: stm32f1xx_hal::gpio::PB9<stm32f1xx_hal::gpio::Input<stm32f1xx_hal::gpio::PullDown>>,
+    }
 
     #[init]
     fn init(ctx: init::Context) -> (Shared, Local) {
@@ -38,7 +44,7 @@ mod app {
         let mut flash = ctx.device.FLASH.constrain();
         let rcc = ctx.device.RCC.constrain();
 
-        let _clocks = rcc
+        let clocks = rcc
             .cfgr
             .use_hse(config::XTAL_FREQ.Hz())
             .sysclk(48.MHz())
@@ -50,16 +56,17 @@ mod app {
         let _dma_channels = ctx.device.DMA1.split(); // for defmt
 
         let mut _afio = ctx.device.AFIO.constrain();
-        let mut gpioa = ctx.device.GPIOA.split();
+        let gpioa = ctx.device.GPIOA.split();
+        let mut gpiob = ctx.device.GPIOB.split();
 
-        let mut usb_pull_up = gpioa.pa10.into_push_pull_output_with_state(
-            &mut gpioa.crh,
-            if !config::USB_PULLUP_ACTVE_LEVEL {
-                stm32f1xx_hal::gpio::PinState::High
-            } else {
-                stm32f1xx_hal::gpio::PinState::Low
-            },
-        );
+        // let mut usb_pull_up = gpioa.pa10.into_push_pull_output_with_state(
+        // &mut gpioa.crh,
+        // if !config::USB_PULLUP_ACTVE_LEVEL {
+        // stm32f1xx_hal::gpio::PinState::High
+        // } else {
+        // stm32f1xx_hal::gpio::PinState::Low
+        // },
+        // );
 
         let usb = stm32f1xx_hal::usb::Peripheral {
             usb: ctx.device.USB,
@@ -73,6 +80,12 @@ mod app {
         .unwrap();
 
         defmt::info!("USB ready");
+
+        let mut timer = ctx.device.TIM2.counter_ms(&clocks);
+        timer
+            .start((config::HID_I2C_POLL_INTERVAL_MS as u32).millis())
+            .ok();
+        timer.listen(Event::Update);
 
         let hid = usbd_hid::hid_class::HIDClass::new(
             usb_bus,
@@ -93,37 +106,70 @@ mod app {
 
         defmt::info!("USB device ready");
 
-        // Initialize the systick interrupt & obtain the token to prove that we did
-        //Mono::start(delay.release().release(), clocks.sysclk().to_Hz());
-
-        defmt::info!("Systick ready");
+        let button = gpiob.pb9.into_pull_down_input(&mut gpiob.crh);
 
         //---------------------------------------------------------------------
 
-        usb_pull_up.toggle(); // enable USB
-        defmt::info!("USB enabled");
+        // usb_pull_up.toggle(); // enable USB
+        // defmt::info!("USB enabled");
 
         //---------------------------------------------------------------------
 
+        (Shared { hid, usb_dev }, Local { timer, button })
+    }
 
-        (Shared { hid, usb_dev }, Local {})
+    #[task(binds = TIM2, shared = [hid], local = [timer, button], priority = 1)]
+    fn timer_isr(ctx: timer_isr::Context) {
+        let timer = ctx.local.timer;
+        let button = ctx.local.button;
+        let mut hid = ctx.shared.hid;
+
+        let a = keycode::KeyMap::from(keycode::KeyMappingId::UsA);
+
+        let result = if button.is_high() {
+            [a.usb as u8, 0, 0, 0, 0, 0]
+        } else {
+            [0, 0, 0, 0, 0, 0]
+        };
+
+        hid.lock(|hid| {
+            hid.push_input(&usbd_hid::descriptor::KeyboardReport {
+                modifier: 0,
+                reserved: 0,
+                leds: 0,
+                keycodes: result,
+            })
+        })
+        .ok();
+
+        timer.clear_interrupt(Event::Update);
     }
 
     //-------------------------------------------------------------------------
 
-    #[task(binds = USB_HP_CAN_TX, shared = [usb_dev, hid], priority = 4)]
-    fn usb_tx(ctx: usb_tx::Context) {
-        let usb_dev = ctx.shared.usb_dev;
-        let hid = ctx.shared.hid;
+    #[idle(shared = [usb_dev, hid])]
+    fn idle(ctx: idle::Context) -> ! {
+        let mut usb_dev = ctx.shared.usb_dev;
+        let mut hid = ctx.shared.hid;
 
-        (usb_dev, hid).lock(|usb_dev, hid| usb_dev.poll(&mut [hid]));
+        loop {
+            (&mut usb_dev, &mut hid).lock(|usb_dev, hid| usb_dev.poll(&mut [hid]));
+        }
     }
 
-    #[task(binds = USB_LP_CAN_RX0, shared = [usb_dev, hid], priority = 4)]
-    fn usb_rx0(ctx: usb_rx0::Context) {
-        let usb_dev = ctx.shared.usb_dev;
-        let hid = ctx.shared.hid;
-
-        (usb_dev, hid).lock(|usb_dev, hid| usb_dev.poll(&mut [hid]));
-    }
+    // #[task(binds = USB_HP_CAN_TX, shared = [usb_dev, hid], priority = 4)]
+    // fn usb_tx(ctx: usb_tx::Context) {
+    // let usb_dev = ctx.shared.usb_dev;
+    // let hid = ctx.shared.hid;
+    //
+    // (usb_dev, hid).lock(|usb_dev, hid| usb_dev.poll(&mut [hid]));
+    // }
+    //
+    // #[task(binds = USB_LP_CAN_RX0, shared = [usb_dev, hid], priority = 4)]
+    // fn usb_rx0(ctx: usb_rx0::Context) {
+    // let usb_dev = ctx.shared.usb_dev;
+    // let hid = ctx.shared.hid;
+    //
+    // (usb_dev, hid).lock(|usb_dev, hid| usb_dev.poll(&mut [hid]));
+    // }
 }
