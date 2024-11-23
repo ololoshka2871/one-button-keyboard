@@ -133,6 +133,14 @@ mod app {
 
     #[task(binds = TIM2, shared = [hid, storage], local = [timer, button, prev_btn_state: bool = false], priority = 1)]
     fn timer_isr(ctx: timer_isr::Context) {
+        const BUTTON_REELASE_REPORT: usbd_hid::descriptor::KeyboardReport =
+            usbd_hid::descriptor::KeyboardReport {
+                modifier: 0,
+                reserved: 0,
+                leds: 0,
+                keycodes: [0, 0, 0, 0, 0, 0],
+            };
+
         let timer = ctx.local.timer;
         let button = ctx.local.button;
         let prev_btn_state = ctx.local.prev_btn_state;
@@ -145,12 +153,7 @@ mod app {
             let report = if new_state {
                 storage.lock(|storage| (&storage.report_pattern).into())
             } else {
-                usbd_hid::descriptor::KeyboardReport {
-                    modifier: 0,
-                    reserved: 0,
-                    leds: 0,
-                    keycodes: [0, 0, 0, 0, 0, 0],
-                }
+                BUTTON_REELASE_REPORT
             };
 
             hid.lock(|hid| hid.push_input(&report)).ok();

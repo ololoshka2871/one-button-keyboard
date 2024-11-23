@@ -1,0 +1,2 @@
+hid>=1.0.0
+# Windows: https://github.com/libusb/hidapi download .dll and place to this dirrectory
