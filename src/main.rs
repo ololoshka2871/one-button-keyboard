@@ -2,6 +2,7 @@
 #![no_std]
 
 mod config;
+mod data_sorage;
 
 use stm32f1xx_hal::prelude::*;
 use stm32f1xx_hal::timer::Event;
@@ -27,6 +28,7 @@ mod app {
     struct Shared {
         hid: usbd_hid::hid_class::HIDClass<'static, UsbBusType>,
         usb_dev: usb_device::device::UsbDevice<'static, UsbBusType>,
+        storage: data_sorage::DataStorage,
     }
 
     #[local]
@@ -105,6 +107,12 @@ mod app {
         defmt::info!("USB device ready");
 
         let button = gpiob.pb9.into_pull_down_input(&mut gpiob.crh);
+        defmt::info!("Button ready");
+
+        //---------------------------------------------------------------------
+
+        let storage = data_sorage::DataStorage::load(flash);
+        defmt::info!("Saved report: {}", storage.report_pattern);
 
         //---------------------------------------------------------------------
 
@@ -113,36 +121,39 @@ mod app {
 
         //---------------------------------------------------------------------
 
-        (Shared { hid, usb_dev }, Local { timer, button })
+        (
+            Shared {
+                hid,
+                usb_dev,
+                storage,
+            },
+            Local { timer, button },
+        )
     }
 
-    #[task(binds = TIM2, shared = [hid], local = [timer, button, prev_btn_state: bool = false], priority = 1)]
+    #[task(binds = TIM2, shared = [hid, storage], local = [timer, button, prev_btn_state: bool = false], priority = 1)]
     fn timer_isr(ctx: timer_isr::Context) {
         let timer = ctx.local.timer;
         let button = ctx.local.button;
         let prev_btn_state = ctx.local.prev_btn_state;
         let mut hid = ctx.shared.hid;
-
-        let a = keycode::KeyMap::from(keycode::KeyMappingId::UsA);
+        let mut storage = ctx.shared.storage;
 
         let new_state = button.is_high();
         if new_state != *prev_btn_state {
             *prev_btn_state = new_state;
-            let result = if new_state {
-                [a.usb as u8, 0, 0, 0, 0, 0]
+            let report = if new_state {
+                storage.lock(|storage| (&storage.report_pattern).into())
             } else {
-                [0, 0, 0, 0, 0, 0]
-            };
-
-            hid.lock(|hid| {
-                hid.push_input(&usbd_hid::descriptor::KeyboardReport {
+                usbd_hid::descriptor::KeyboardReport {
                     modifier: 0,
                     reserved: 0,
                     leds: 0,
-                    keycodes: result,
-                })
-            })
-            .ok();
+                    keycodes: [0, 0, 0, 0, 0, 0],
+                }
+            };
+
+            hid.lock(|hid| hid.push_input(&report)).ok();
         }
 
         timer.clear_interrupt(Event::Update);
@@ -157,6 +168,31 @@ mod app {
 
         loop {
             (&mut usb_dev, &mut hid).lock(|usb_dev, hid| usb_dev.poll(&mut [hid]));
+
+            hid.lock(|hid| {
+                let mut report = [0u8; 64];
+                if let Ok(report_info) = hid.pull_raw_report(&mut report) {
+                    defmt::warn!(
+                        "New report: ty:={}, id={} {}",
+                        report_info.report_type as u8,
+                        report_info.report_id,
+                        &report[..report_info.len]
+                    );
+                }
+            });
         }
+    }
+
+    //-------------------------------------------------------------------------
+
+    #[task(shared = [storage], priority = 1)]
+    async fn saver(mut ctx: saver::Context) {
+        ctx.shared.storage.lock(|storage| {
+            cortex_m::interrupt::free(|cs| {
+                if let Err(e) = storage.save(cs) {
+                    defmt::error!("Failed to save settings: {}", defmt::Debug2Format(&e))
+                }
+            })
+        })
     }
 }
