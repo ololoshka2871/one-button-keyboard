@@ -28,6 +28,8 @@ use stm32f0xx_hal::{
     pac::FLASH,
 };
 
+use crate::report::KeyboardReport;
+
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 pub enum SettingsStoreError {
@@ -43,12 +45,10 @@ pub struct ReportPattern {
     pub keycodes: [u8; 6],
 }
 
-impl Into<usbd_hid::descriptor::KeyboardReport> for &ReportPattern {
-    fn into(self) -> usbd_hid::descriptor::KeyboardReport {
-        usbd_hid::descriptor::KeyboardReport {
+impl Into<KeyboardReport> for &ReportPattern {
+    fn into(self) -> KeyboardReport {
+        KeyboardReport {
             modifier: self.modifier,
-            reserved: 0,
-            leds: 0,
             keycodes: self.keycodes,
         }
     }

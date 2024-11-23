@@ -3,6 +3,7 @@
 
 mod config;
 mod data_sorage;
+mod report;
 
 use stm32f1xx_hal::prelude::*;
 use stm32f1xx_hal::timer::Event;
@@ -89,7 +90,7 @@ mod app {
 
         let hid = usbd_hid::hid_class::HIDClass::new(
             usb_bus,
-            usbd_hid::descriptor::KeyboardReport::desc(),
+            report::KeyboardReport::desc(),
             config::HID_I2C_POLL_INTERVAL_MS,
         );
 
@@ -133,14 +134,6 @@ mod app {
 
     #[task(binds = TIM2, shared = [hid, storage], local = [timer, button, prev_btn_state: bool = false], priority = 1)]
     fn timer_isr(ctx: timer_isr::Context) {
-        const BUTTON_REELASE_REPORT: usbd_hid::descriptor::KeyboardReport =
-            usbd_hid::descriptor::KeyboardReport {
-                modifier: 0,
-                reserved: 0,
-                leds: 0,
-                keycodes: [0, 0, 0, 0, 0, 0],
-            };
-
         let timer = ctx.local.timer;
         let button = ctx.local.button;
         let prev_btn_state = ctx.local.prev_btn_state;
@@ -153,7 +146,7 @@ mod app {
             let report = if new_state {
                 storage.lock(|storage| (&storage.report_pattern).into())
             } else {
-                BUTTON_REELASE_REPORT
+                report::KeyboardReport::empty()
             };
 
             hid.lock(|hid| hid.push_input(&report)).ok();
