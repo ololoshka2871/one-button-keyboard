@@ -8,8 +8,7 @@ mod report;
 use stm32f1xx_hal::prelude::*;
 use stm32f1xx_hal::timer::Event;
 use stm32f1xx_hal::usb::Peripheral;
-
-use stm32_usbd::UsbBus;
+use stm32f1xx_hal::usb::UsbBus;
 
 use stm32f1xx_hal::usb::UsbBusType;
 
@@ -27,7 +26,8 @@ mod app {
 
     #[shared]
     struct Shared {
-        hid: usbd_hid::hid_class::HIDClass<'static, UsbBusType>,
+        hid_kbd: usbd_hid::hid_class::HIDClass<'static, UsbBusType>,
+        hid_ctrl: usbd_hid::hid_class::HIDClass<'static, UsbBusType>,
         usb_dev: usb_device::device::UsbDevice<'static, UsbBusType>,
         storage: data_sorage::DataStorage,
     }
@@ -51,13 +51,12 @@ mod app {
             .sysclk(48.MHz())
             .pclk1(24.MHz())
             .freeze(&mut flash.acr);
-
         defmt::info!("Clocks ready");
 
         let _dma_channels = ctx.device.DMA1.split(); // for defmt
 
         let mut _afio = ctx.device.AFIO.constrain();
-        let gpioa = ctx.device.GPIOA.split();
+        let mut gpioa = ctx.device.GPIOA.split();
         let mut gpiob = ctx.device.GPIOB.split();
 
         // let mut usb_pull_up = gpioa.pa10.into_push_pull_output_with_state(
@@ -69,32 +68,46 @@ mod app {
         // },
         // );
 
+        // https://github.com/will-hart/pedalrs/blob/dd33bf753c9d482c38a8365cc925822f105b12cd/src/configure/stm32f103.rs#L77
+        // BluePill board has a pull-up resistor on the D+ line.
+        // Pull the D+ pin down to send a RESET condition to the USB bus.
+        // This forced reset is needed only for development, without it host
+        // will not reset your device when you upload new firmware.
+        let mut usb_dp = gpioa.pa12.into_push_pull_output(&mut gpioa.crh);
+        usb_dp.set_low();
+        cortex_m::asm::delay(1000); // >1 us, I think
+
         let usb = stm32f1xx_hal::usb::Peripheral {
             usb: ctx.device.USB,
             pin_dm: gpioa.pa11,
-            pin_dp: gpioa.pa12,
+            pin_dp: usb_dp.into_floating_input(&mut gpioa.crh),
         };
 
         let usb_bus = cortex_m::singleton!(
-            : usb_device::bus::UsbBusAllocator<UsbBus<Peripheral>> = stm32_usbd::UsbBus::new(usb)
+            : usb_device::bus::UsbBusAllocator<UsbBus<Peripheral>> = UsbBus::new(usb)
         )
         .unwrap();
-
-        defmt::info!("USB ready");
 
         let mut timer = ctx.device.TIM2.counter_ms(&clocks);
         timer
             .start((config::HID_I2C_POLL_INTERVAL_MS as u32).millis())
             .ok();
         timer.listen(Event::Update);
+        defmt::info!("Timer ready");
 
-        let hid = usbd_hid::hid_class::HIDClass::new(
+        let hid_kbd = usbd_hid::hid_class::HIDClass::new(
             usb_bus,
             report::KeyboardReport::desc(),
             config::HID_I2C_POLL_INTERVAL_MS,
         );
-
         defmt::info!("HID ready");
+
+        let hid_ctrl = usbd_hid::hid_class::HIDClass::new(
+            usb_bus,
+            report::ControlDesctiptor::desc(),
+            config::HID_I2C_POLL_INTERVAL_MS,
+        );
+        defmt::info!("HID2 ready");
 
         let usb_dev = usb_device::device::UsbDeviceBuilder::new(
             usb_bus,
@@ -103,8 +116,8 @@ mod app {
         .manufacturer("Shilo.XyZ")
         .product("OneButtonKeyboard")
         .serial_number(stm32_device_signature::device_id_hex())
+        .composite_with_iads()
         .build();
-
         defmt::info!("USB device ready");
 
         let button = gpiob.pb9.into_pull_down_input(&mut gpiob.crh);
@@ -124,7 +137,8 @@ mod app {
 
         (
             Shared {
-                hid,
+                hid_kbd,
+                hid_ctrl,
                 usb_dev,
                 storage,
             },
@@ -132,12 +146,12 @@ mod app {
         )
     }
 
-    #[task(binds = TIM2, shared = [hid, storage], local = [timer, button, prev_btn_state: bool = false], priority = 1)]
+    #[task(binds = TIM2, shared = [hid_kbd, storage], local = [timer, button, prev_btn_state: bool = false], priority = 1)]
     fn timer_isr(ctx: timer_isr::Context) {
         let timer = ctx.local.timer;
         let button = ctx.local.button;
         let prev_btn_state = ctx.local.prev_btn_state;
-        let mut hid = ctx.shared.hid;
+        let mut hid_kbd = ctx.shared.hid_kbd;
         let mut storage = ctx.shared.storage;
 
         let new_state = button.is_high();
@@ -149,7 +163,7 @@ mod app {
                 report::KeyboardReport::empty()
             };
 
-            hid.lock(|hid| hid.push_input(&report)).ok();
+            hid_kbd.lock(|hid_kbd| hid_kbd.push_input(&report)).ok();
         }
 
         timer.clear_interrupt(Event::Update);
@@ -157,25 +171,28 @@ mod app {
 
     //-------------------------------------------------------------------------
 
-    #[idle(shared = [usb_dev, hid])]
+    #[idle(shared = [usb_dev, hid_kbd, hid_ctrl])]
     fn idle(ctx: idle::Context) -> ! {
+        let mut ctrl_report = [0u8; 64];
+
         let mut usb_dev = ctx.shared.usb_dev;
-        let mut hid = ctx.shared.hid;
+        let mut hid_kbd = ctx.shared.hid_kbd;
+        let mut hid_ctrl = ctx.shared.hid_ctrl;
 
         loop {
-            (&mut usb_dev, &mut hid).lock(|usb_dev, hid| usb_dev.poll(&mut [hid]));
-
-            hid.lock(|hid| {
-                let mut report = [0u8; 64];
-                if let Ok(report_info) = hid.pull_raw_report(&mut report) {
-                    defmt::warn!(
-                        "New report: ty:={}, id={} {}",
-                        report_info.report_type as u8,
-                        report_info.report_id,
-                        &report[..report_info.len]
-                    );
-                }
-            });
+            if (&mut usb_dev, &mut hid_kbd, &mut hid_ctrl)
+                .lock(|usb_dev, hid_kbd, hid_ctrl| usb_dev.poll(&mut [hid_kbd, hid_ctrl]))
+            {
+                hid_ctrl.lock(|hid_ctrl| {
+                    match hid_ctrl.pull_raw_output(&mut ctrl_report) {
+                        Ok(size) => {
+                            defmt::warn!("hid_ctrl report: {:#X}", ctrl_report[..size]);
+                        }
+                        Err(usbd_hid::UsbError::WouldBlock) => {}
+                        Err(e) => defmt::error!("Error: {}", e),
+                    }
+                })
+            }
         }
     }
 
