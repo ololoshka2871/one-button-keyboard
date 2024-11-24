@@ -38,11 +38,12 @@ jobs:
           file: 'Cargo.toml'
           field: 'package.version'
 
-      - uses: akkuman/gitea-release-action@v1
+      - name: Create release
+        uses: softprops/action-gh-release@v2
         with:
           name: v${{ steps.read_version.outputs.value }}
           body: This is an automatic ${{ steps.read_version.outputs.value }} release!
           prerelease: true
           files: |
             one-button-keyboard.bin
-            scripts.tar.gz
+            scripts.tar.gz 
