@@ -1,4 +1,5 @@
 ## Установка комбинации клавиш для one-button-keyboard
+
 Требуется [python3](https://www.python.org/downloads/) и установленные библитеки
 - [`hid`](https://pypi.org/project/hid/)
 - [`keyboard`](https://pypi.org/project/keyboard/)
@@ -6,6 +7,7 @@
 Запускать предпочтительно в [venv](https://python.land/virtual-environments/virtualenv)
 
 ## Установка
+
 0. Создать `venv` и зайти в него
     ```ps
     python -m venv venv
