@@ -1,5 +1,5 @@
-use serde::ser::{Serialize, SerializeTuple, Serializer};
-use usbd_hid::descriptor::{gen_hid_descriptor, AsInputReport, SerializedDescriptor};
+use usbd_hid_macros::gen_hid_descriptor;
+use usbd_hid::descriptor::{generator_prelude::*, AsInputReport, SerializedDescriptor};
 
 /// KeyboardReport describes a report and its companion descriptor that can be
 /// used to send keyboard button presses to a host and receive the status of the
@@ -37,8 +37,13 @@ impl KeyboardReport {
         (usage_min = 0x00, usage_max = 0xFF) = { 
             #[item_settings data,array,absolute] set_report_pattern=output;
         };
+        (usage_min = 0x00, usage_max = 0xFF) = { 
+            #[item_settings data,array,absolute] get_report_pattern=input;
+        };
     }
 )]
+#[derive(Default)]
 pub struct ControlDesctiptor {
     pub set_report_pattern: [u8; 7],
+    pub get_report_pattern: [u8; 7],
 }

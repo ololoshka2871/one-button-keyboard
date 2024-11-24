@@ -18,8 +18,7 @@ rtic = { version = "2.1", features = ["rtic-monotonics"] }
 
 usb-device = { version = "0.2.9", features = ["defmt", "control-buffer-256"] }
 usbd-hid = { version = "0.6", features = ["defmt"] }
-
-serde = { version = "1", default-features = false }
+usbd-hid-macros = "0.6"
 
 panic-probe = { version = "0.3", default-features = false }
 

@@ -24,7 +24,7 @@ def main():
         # print(f'Product: {h.product}')
         # print(f'Serial Number: {h.serial}')
         
-        h.write(bytes([1, 1, 2, 20, 4, 5, 60]))
+        h.write(bytes([1, 1, 2, 20, 4, 5, 60, 8]))
 
 
 if __name__ == '__main__':

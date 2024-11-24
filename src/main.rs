@@ -171,41 +171,69 @@ mod app {
 
     //-------------------------------------------------------------------------
 
-    #[idle(shared = [usb_dev, hid_kbd, hid_ctrl])]
+    #[idle(shared = [usb_dev, hid_kbd, hid_ctrl, storage])]
     fn idle(ctx: idle::Context) -> ! {
+        use packed_struct::PackedStructSlice;
+
         let mut ctrl_report = [0u8; 64];
 
         let mut usb_dev = ctx.shared.usb_dev;
         let mut hid_kbd = ctx.shared.hid_kbd;
         let mut hid_ctrl = ctx.shared.hid_ctrl;
+        let mut storage = ctx.shared.storage;
 
         loop {
             if (&mut usb_dev, &mut hid_kbd, &mut hid_ctrl)
                 .lock(|usb_dev, hid_kbd, hid_ctrl| usb_dev.poll(&mut [hid_kbd, hid_ctrl]))
             {
-                hid_ctrl.lock(|hid_ctrl| {
+                if let Some(pattern) = hid_ctrl.lock(|hid_ctrl| {
                     match hid_ctrl.pull_raw_output(&mut ctrl_report) {
                         Ok(size) => {
-                            defmt::warn!("hid_ctrl report: {:#X}", ctrl_report[..size]);
+                            match data_sorage::ReportPattern::unpack_from_slice(
+                                &ctrl_report[..size],
+                            ) {
+                                Ok(pattern) => {
+                                    defmt::info!("New pattern: {}", &pattern);
+
+                                    {
+                                        // set pattern
+                                        let mut res = report::ControlDesctiptor::default();
+                                        res.get_report_pattern
+                                            .copy_from_slice(&ctrl_report[..size]);
+                                        hid_ctrl.push_input(&res).ok();
+                                    }
+
+                                    return Some(pattern);
+                                }
+                                Err(e) => defmt::error!(
+                                    "Unpack error: {:#X} ({})",
+                                    &ctrl_report[..size],
+                                    defmt::Debug2Format(&e)
+                                ),
+                            }
                         }
-                        Err(usbd_hid::UsbError::WouldBlock) => {}
-                        Err(e) => defmt::error!("Error: {}", e),
+                        Err(usbd_hid::UsbError::WouldBlock) => { /* ok */ }
+                        Err(e) => {
+                            defmt::error!("USB Command error: {}", e)
+                        }
                     }
-                })
+
+                    None
+                }) {
+                    storage.lock(|storage| {
+                        storage.report_pattern = pattern;
+
+                        cortex_m::interrupt::free(|cs| {
+                            if let Err(e) = storage.save(cs) {
+                                defmt::error!(
+                                    "Failed to save settings: {}",
+                                    defmt::Debug2Format(&e)
+                                )
+                            }
+                        })
+                    })
+                }
             }
         }
-    }
-
-    //-------------------------------------------------------------------------
-
-    #[task(shared = [storage], priority = 1)]
-    async fn saver(mut ctx: saver::Context) {
-        ctx.shared.storage.lock(|storage| {
-            cortex_m::interrupt::free(|cs| {
-                if let Err(e) = storage.save(cs) {
-                    defmt::error!("Failed to save settings: {}", defmt::Debug2Format(&e))
-                }
-            })
-        })
     }
 }

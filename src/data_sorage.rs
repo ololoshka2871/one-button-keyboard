@@ -55,6 +55,7 @@ impl Into<KeyboardReport> for &ReportPattern {
 }
 
 #[derive(PackedStruct, Clone)]
+#[packed_struct(size_bytes = "10")]
 struct SaveStruct {
     #[packed_field(size_bytes = "7")]
     report_pattern: ReportPattern,
@@ -63,7 +64,7 @@ struct SaveStruct {
 }
 
 #[link_section = ".uninit_settings.save_struct"]
-static mut SAVE_SPACE: MaybeUninit<[u8; 9]> = MaybeUninit::uninit();
+static mut SAVE_SPACE: MaybeUninit<[u8; 10]> = MaybeUninit::uninit();
 
 pub struct DataStorage {
     pub report_pattern: ReportPattern,
@@ -121,6 +122,8 @@ impl DataStorage {
                     flash,
                 };
             }
+        } else {
+            defmt::error!("CRC not match: {:#X}", crc);
         }
         let mut res = Self {
             flash,
@@ -144,9 +147,9 @@ impl DataStorage {
 
         {
             let len = packed.len();
-            let crc = crc16(&packed[0..len - core::mem::size_of::<u16>()]);
+            let crc = crc16(&packed[..len - core::mem::size_of::<u16>()]);
             let crc_pos = &mut packed[len - core::mem::size_of::<u16>()..];
-            crc_pos.copy_from_slice(&crc.to_le_bytes());
+            crc_pos.copy_from_slice(&crc.to_be_bytes());
         }
 
         let save_space =
