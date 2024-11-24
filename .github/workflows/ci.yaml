@@ -7,8 +7,16 @@ on:
 
 jobs:
   build:
-    runs-on: rust-stm32
+    runs-on: ubuntu-24.04
     steps:
+      - name: Install compiler
+        run: rustup target add thumbv7em-none-eabihf
+
+      - name: Install tools
+        run: |
+          cargo install cargo-binutils
+          rustup component add llvm-tools          
+
       - name: Clone
         uses: actions/checkout@v4
         with:
@@ -22,7 +30,7 @@ jobs:
           tar -czf scripts.tar.gz -C scripts hid_code.py setup-key.py requirements.txt README.md
 
       - name: Create binary dist
-        run: arm-none-eabi-objcopy -O binary target/thumbv7m-none-eabi/release/one-button-keyboard one-button-keyboard.bin
+        run: rust-objcopy -O binary target/thumbv7m-none-eabi/release/one-button-keyboard one-button-keyboard.bin
 
       - uses: SebRollen/toml-action@v1.2.0
         id: read_version
