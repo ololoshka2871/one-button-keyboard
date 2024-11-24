@@ -17,3 +17,7 @@ jobs:
 
       - name: Build
         run: cargo build --release
+
+      - name: Pack tools
+        run: |
+          tar -czf scripts.tar.gz -C scripts hid_code.py setup-key.py requirements.txt README.md

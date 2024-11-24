@@ -23,9 +23,15 @@ jobs:
           file: 'Cargo.toml'
           field: 'package.version'
 
+      - name: Pack tools
+        run: |
+          tar -czf scripts.tar.gz -C scripts hid_code.py setup-key.py requirements.txt README.md
+
       - uses: akkuman/gitea-release-action@v1
         with:
           name: v${{ steps.read_version.outputs.value }}
           body: This is an automatic ${{ steps.read_version.outputs.value }} release!
           prerelease: true
-          files: target/thumbv7m-none-eabi/release/one-button-keyboard
+          files: |
+            target/thumbv7m-none-eabi/release/one-button-keyboard
+            scripts.tar.gz
