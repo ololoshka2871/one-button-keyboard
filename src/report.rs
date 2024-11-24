@@ -15,6 +15,15 @@ use usbd_hid::descriptor::{generator_prelude::*, AsInputReport, SerializedDescri
     }
 )]
 pub struct KeyboardReport {
+    // https://tetherscript.com/kbhid/hidkb-using-the-keyboard-driver/#:~:text=There%20are%20eight%20modifiers%2C%20and%20each%20modifier%20represents,it%2C%20you%20would%20set%20bit%20zero%20to%200.
+    // Bit 0 = LCTRL: Left Control Key
+    // Bit 1 = LSHIFT: Left Shift Key
+    // Bit 2 = LALT: Left Alt Key
+    // Bit 3 = LWIN: Left Control Key
+    // Bit 4 = RCTRL: Right Control Key
+    // Bit 5 = RSHIFT: Right Shift Key
+    // Bit 6 = RALT: Right Alt Key
+    // Bit 7 = RWIN: Right Windows Key
     pub modifier: u8,
     pub keycodes: [u8; 6],
 }

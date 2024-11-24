@@ -22,6 +22,8 @@ use rtic::app;
 
 #[app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [RTCALARM, FLASH])]
 mod app {
+    use packed_struct::PackedStructSlice;
+
     use super::*;
 
     #[shared]
@@ -146,16 +148,22 @@ mod app {
         )
     }
 
-    #[task(binds = TIM2, shared = [hid_kbd, storage], local = [timer, button, prev_btn_state: bool = false], priority = 1)]
+    #[task(binds = TIM2, shared = [hid_kbd, hid_ctrl, storage], local = [
+        timer, button, 
+        prev_btn_state: bool = false,
+        counter: u32 = 0,
+    ], priority = 1)]
     fn timer_isr(ctx: timer_isr::Context) {
         let timer = ctx.local.timer;
         let button = ctx.local.button;
         let prev_btn_state = ctx.local.prev_btn_state;
+        let counter = ctx.local.counter;
         let mut hid_kbd = ctx.shared.hid_kbd;
+        let mut hid_ctrl = ctx.shared.hid_ctrl;
         let mut storage = ctx.shared.storage;
 
         let new_state = button.is_high();
-        if new_state != *prev_btn_state {
+        if new_state != *prev_btn_state || *counter == 10 {
             *prev_btn_state = new_state;
             let report = if new_state {
                 storage.lock(|storage| (&storage.report_pattern).into())
@@ -164,6 +172,17 @@ mod app {
             };
 
             hid_kbd.lock(|hid_kbd| hid_kbd.push_input(&report)).ok();
+        }
+
+        if *counter == 10 {
+            *counter = 0;
+
+            let mut res = report::ControlDesctiptor::default();
+            let pattern = storage.lock(|storage| storage.report_pattern.clone());
+            pattern.pack_to_slice(&mut res.get_report_pattern).ok();
+            hid_ctrl.lock(|hid_ctrl| hid_ctrl.push_input(&res).ok());
+        } else {
+            *counter += 1;
         }
 
         timer.clear_interrupt(Event::Update);
@@ -194,15 +213,6 @@ mod app {
                             ) {
                                 Ok(pattern) => {
                                     defmt::info!("New pattern: {}", &pattern);
-
-                                    {
-                                        // set pattern
-                                        let mut res = report::ControlDesctiptor::default();
-                                        res.get_report_pattern
-                                            .copy_from_slice(&ctrl_report[..size]);
-                                        hid_ctrl.push_input(&res).ok();
-                                    }
-
                                     return Some(pattern);
                                 }
                                 Err(e) => defmt::error!(
