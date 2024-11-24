@@ -1,31 +1,18 @@
 #!/usr/bin/env python
-# Run this code from root!
 
 import os
 import keyboard
 import struct
 import time
 
+from hid_code import codes_table
+
 if os.name == 'nt':
     import ctypes
+    # preload dll to ensure success link in windows
     ctypes.CDLL(f'{os.path.dirname(os.path.abspath(__file__))}/hidapi.dll')
 
 import hid
-
-try:
-    # Python2
-    long, basestring
-    _is_str = lambda x: isinstance(x, basestring)
-    _is_number = lambda x: isinstance(x, (int, long))
-    import Queue as _queue
-    # threading.Event is a function in Python2 wrappin _Event (?!).
-    from threading import _Event as _UninterruptibleEvent
-except NameError:
-    # Python3
-    _is_str = lambda x: isinstance(x, str)
-    _is_number = lambda x: isinstance(x, int)
-    import queue as _queue
-    from threading import Event as _UninterruptibleEvent
 
 DEFAULT_VID = 0x16c0
 DEFAULT_PID = 0x314f
@@ -34,11 +21,8 @@ DEFAULT_PATH=b'\\\\?\\HID#VID_16C0&PID_314F&MI_01#8&1f6c5a59&0&0000#{4d1e55b2-f1
 
 
 def read_hotkey(suppress=True):
-    """
-    Similar to `read_key()`, but blocks until the user presses and releases a
-    hotkey (or single key), then returns a string representing the hotkey
-    pressed.
-    """
+    import queue as _queue
+    
     queue = _queue.Queue()
     fn = lambda e: queue.put(e) or e.event_type == keyboard.KEY_DOWN
     hooked = keyboard.hook(fn, suppress=suppress)
@@ -49,7 +33,13 @@ def read_hotkey(suppress=True):
             with keyboard._pressed_events_lock:
                 names = [e.name for e in keyboard._pressed_events.values()] + [event.name]
             return names
-        
+    
+    
+def scancode(character) -> int:
+    code = codes_table()[character]
+    return code
+    #return keyboard.key_to_scan_codes(character)[0]
+    
         
 def main():
     # for d in hid.enumerate(DEFAULT_VID, DEFAULT_PID):
@@ -81,7 +71,7 @@ def main():
             modifiers = modifiers | all_modifiers[m]
             pressed.remove(m)
             
-    keys = [ keyboard.key_to_scan_codes(key)[0] for key in pressed ]
+    keys = [scancode(key) for key in pressed]
     for i in range(3 - len(keys)):
         keys.append(0)
     
@@ -97,7 +87,7 @@ def main():
         time.sleep(0.5)
 
         res = h.read(len(data))
-        if res == data:
+        if res == data[1:]:
             print("Applyed succesfuly!")
         else:
             print(f"Failed to apply hotkey ({res})")
