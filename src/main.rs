@@ -57,27 +57,32 @@ mod app {
 
         let _dma_channels = ctx.device.DMA1.split(); // for defmt
 
-        let mut _afio = ctx.device.AFIO.constrain();
         let mut gpioa = ctx.device.GPIOA.split();
         let mut gpiob = ctx.device.GPIOB.split();
 
-        // let mut usb_pull_up = gpioa.pa10.into_push_pull_output_with_state(
-        // &mut gpioa.crh,
-        // if !config::USB_PULLUP_ACTVE_LEVEL {
-        // stm32f1xx_hal::gpio::PinState::High
-        // } else {
-        // stm32f1xx_hal::gpio::PinState::Low
-        // },
-        // );
+        let (usb_pull_up, usb_dp) = if let Some(usb_pull_up_lvl) = config::USB_PULLUP_ACTVE_LEVEL {
+            // pa10 or replace to your pin
+            let usb_pull_up = gpioa.pa10.into_push_pull_output_with_state(
+                &mut gpioa.crh,
+                if !usb_pull_up_lvl {
+                    stm32f1xx_hal::gpio::PinState::High
+                } else {
+                    stm32f1xx_hal::gpio::PinState::Low
+                },
+            );
+            (Some(usb_pull_up), gpioa.pa12.into_push_pull_output(&mut gpioa.crh))
+        } else {
+            // https://github.com/will-hart/pedalrs/blob/dd33bf753c9d482c38a8365cc925822f105b12cd/src/configure/stm32f103.rs#L77
+            // BluePill board has a pull-up resistor on the D+ line.
+            // Pull the D+ pin down to send a RESET condition to the USB bus.
+            // This forced reset is needed only for development, without it host
+            // will not reset your device when you upload new firmware.
+            let mut usb_dp = gpioa.pa12.into_push_pull_output(&mut gpioa.crh);
+            usb_dp.set_low();
+            cortex_m::asm::delay(1000);
 
-        // https://github.com/will-hart/pedalrs/blob/dd33bf753c9d482c38a8365cc925822f105b12cd/src/configure/stm32f103.rs#L77
-        // BluePill board has a pull-up resistor on the D+ line.
-        // Pull the D+ pin down to send a RESET condition to the USB bus.
-        // This forced reset is needed only for development, without it host
-        // will not reset your device when you upload new firmware.
-        let mut usb_dp = gpioa.pa12.into_push_pull_output(&mut gpioa.crh);
-        usb_dp.set_low();
-        cortex_m::asm::delay(1000); // >1 us, I think
+            (None, usb_dp)
+        };
 
         let usb = stm32f1xx_hal::usb::Peripheral {
             usb: ctx.device.USB,
@@ -113,7 +118,7 @@ mod app {
 
         let usb_dev = usb_device::device::UsbDeviceBuilder::new(
             usb_bus,
-            usb_device::prelude::UsbVidPid(0x16c0, 0x314f),
+            usb_device::prelude::UsbVidPid(config::USB_VID, config::USB_PID),
         )
         .manufacturer("Shilo.XyZ")
         .product("OneButtonKeyboard")
@@ -132,8 +137,10 @@ mod app {
 
         //---------------------------------------------------------------------
 
-        // usb_pull_up.toggle(); // enable USB
-        // defmt::info!("USB enabled");
+        if let Some(mut usb_pull_up) = usb_pull_up {
+            usb_pull_up.toggle(); // enable USB
+            defmt::info!("USB enabled");
+        }
 
         //---------------------------------------------------------------------
 

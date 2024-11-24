@@ -74,6 +74,5 @@ def codes_table() -> dict:
         hid_codes = {}
         for c in SCAN_CODES.keys():
             for key in SCAN_CODES[c]:
-                if len(key) == 1:
-                    hid_codes[key] = c
+                hid_codes[key.lower()] = c
     return hid_codes
