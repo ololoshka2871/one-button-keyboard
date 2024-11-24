@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Install compiler
-        run: rustup target add thumbv7m-none-eabihf
+        run: rustup target add thumbv7m-none-eabi
         
       - name: Clone
         uses: actions/checkout@v4
