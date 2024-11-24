@@ -3,7 +3,7 @@ pub const XTAL_FREQ: u32 = 8_000_000;
 //-----------------------------------------------------------------------------
 
 // usb pull up
-pub const USB_PULLUP_ACTVE_LEVEL: bool = false;
+//pub const USB_PULLUP_ACTVE_LEVEL: bool = false;
 
 //-----------------------------------------------------------------------------
 

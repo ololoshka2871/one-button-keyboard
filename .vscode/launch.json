@@ -40,6 +40,16 @@
                 "break main",
                 "monitor reset halt"
             ]
+        },
+        {
+            "name": "Настройка",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "scripts/setup-key.py",
+            "console": "integratedTerminal",
+            "args": [
+                "a"
+            ],
         }
     ]
 }

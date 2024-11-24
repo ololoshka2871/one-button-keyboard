@@ -25,3 +25,7 @@ __pycache__/
 
 #regs
 *_regs.txt
+
+## python
+.venv
+hidapi.dll
