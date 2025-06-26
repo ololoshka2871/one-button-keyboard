@@ -1,5 +1,6 @@
 #![no_main]
 #![no_std]
+#![allow(static_mut_refs)]
 
 mod config;
 mod data_sorage;
