@@ -63,7 +63,7 @@ SCAN_CODES = {
     0x50: ('LEFT',),
     0x51: ('DOWN',),
     0x52: ('UP',),
-} | {0x3A + i: f'F{i + 1}' for i in range(12)}
+} | {0x3A + i: (f'F{i + 1}',) for i in range(12)}
 
 
 hid_codes = None
