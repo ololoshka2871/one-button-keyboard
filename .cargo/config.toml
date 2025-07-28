@@ -10,6 +10,8 @@
 # runner = "gdb -q -x openocd.gdb"
 runner = "probe-rs run --no-location --chip STM32F103CB"
 
+[target.thumbv6m-none-eabi]
+
 rustflags = [
   # This is needed if your flash or ram addresses are not aligned to 0x10000 in memory.x
   # See https://github.com/rust-embedded/cortex-m-quickstart/pull/95
@@ -39,7 +41,7 @@ rustflags = [
 [build]
 # Pick ONE of these compilation targets
 # target = "thumbv6m-none-eabi"        # Cortex-M0 and Cortex-M0+
-target = "thumbv7m-none-eabi"        # Cortex-M3
+# target = "thumbv7m-none-eabi"        # Cortex-M3
 # target = "thumbv7em-none-eabi"       # Cortex-M4 and Cortex-M7 (no FPU)
 # target = "thumbv7em-none-eabihf"     # Cortex-M4F and Cortex-M7F (with FPU)
 # target = "thumbv8m.base-none-eabi"   # Cortex-M23

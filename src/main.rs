@@ -14,6 +14,7 @@ use stm32f1xx_hal::usb::UsbBusType;
 
 use usbd_hid::descriptor::SerializedDescriptor;
 
+#[cfg(feature = "defmt")]
 use defmt_rtt as _; // global logger
 
 use panic_probe as _;
@@ -42,6 +43,7 @@ mod app {
 
     #[init]
     fn init(ctx: init::Context) -> (Shared, Local) {
+        #[cfg(feature = "defmt")]
         defmt::info!("Init...");
 
         let mut flash = ctx.device.FLASH.constrain();
@@ -53,6 +55,8 @@ mod app {
             .sysclk(48.MHz())
             .pclk1(24.MHz())
             .freeze(&mut flash.acr);
+
+        #[cfg(feature = "defmt")]
         defmt::info!("Clocks ready");
 
         let _dma_channels = ctx.device.DMA1.split(); // for defmt
@@ -100,6 +104,8 @@ mod app {
             .start((config::HID_I2C_POLL_INTERVAL_MS as u32).millis())
             .ok();
         timer.listen(Event::Update);
+
+        #[cfg(feature = "defmt")]
         defmt::info!("Timer ready");
 
         let hid_kbd = usbd_hid::hid_class::HIDClass::new(
@@ -107,6 +113,8 @@ mod app {
             report::KeyboardReport::desc(),
             config::HID_I2C_POLL_INTERVAL_MS,
         );
+
+        #[cfg(feature = "defmt")]
         defmt::info!("HID ready");
 
         let hid_ctrl = usbd_hid::hid_class::HIDClass::new(
@@ -114,6 +122,8 @@ mod app {
             report::ControlDesctiptor::desc(),
             config::HID_I2C_POLL_INTERVAL_MS,
         );
+
+        #[cfg(feature = "defmt")]
         defmt::info!("HID2 ready");
 
         let usb_dev = usb_device::device::UsbDeviceBuilder::new(
@@ -125,20 +135,27 @@ mod app {
         .serial_number(stm32_device_signature::device_id_hex())
         .composite_with_iads()
         .build();
+
+        #[cfg(feature = "defmt")]
         defmt::info!("USB device ready");
 
         let button = gpiob.pb9.into_pull_down_input(&mut gpiob.crh);
+        #[cfg(feature = "defmt")]
         defmt::info!("Button ready");
 
         //---------------------------------------------------------------------
 
         let storage = data_sorage::DataStorage::load(flash);
+
+        #[cfg(feature = "defmt")]
         defmt::info!("Saved report: {}", storage.report_pattern);
 
         //---------------------------------------------------------------------
 
         if let Some(mut usb_pull_up) = usb_pull_up {
             usb_pull_up.toggle(); // enable USB
+
+            #[cfg(feature = "defmt")]
             defmt::info!("USB enabled");
         }
 
@@ -219,18 +236,23 @@ mod app {
                                 &ctrl_report[..size],
                             ) {
                                 Ok(pattern) => {
+                                    #[cfg(feature = "defmt")]
                                     defmt::info!("New pattern: {}", &pattern);
                                     return Some(pattern);
                                 }
-                                Err(e) => defmt::error!(
-                                    "Unpack error: {:#X} ({})",
-                                    &ctrl_report[..size],
-                                    defmt::Debug2Format(&e)
-                                ),
+                                Err(e) => {
+                                    #[cfg(feature = "defmt")]
+                                    defmt::error!(
+                                        "Unpack error: {:#X} ({})",
+                                        &ctrl_report[..size],
+                                        defmt::Debug2Format(&e)
+                                    );
+                                }
                             }
                         }
                         Err(usbd_hid::UsbError::WouldBlock) => { /* ok */ }
                         Err(e) => {
+                            #[cfg(feature = "defmt")]
                             defmt::error!("USB Command error: {}", e)
                         }
                     }
@@ -242,6 +264,7 @@ mod app {
 
                         cortex_m::interrupt::free(|cs| {
                             if let Err(e) = storage.save(cs) {
+                                #[cfg(feature = "defmt")]
                                 defmt::error!(
                                     "Failed to save settings: {}",
                                     defmt::Debug2Format(&e)

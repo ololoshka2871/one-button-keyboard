@@ -56,6 +56,10 @@ const FLASH_PAGE_SIZE: u32 = 2;
 const FLASH_PAGE_SIZE: u32 = 1;
 
 fn main() {
+    if !cfg!(any(feature = "stm32f103c8", feature = "stm32f103cb", feature = "stm32f072c8")) {
+        panic!("No target feature enabled. Please enable one of the features: stm32f103c8, stm32f103cb, stm32f072c8.");
+    }
+
     // Put the linker script somewhere the linker can find it
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
 

@@ -5,6 +5,9 @@
 
     // Убрать ошибку Can't find crate for 'test'
     "rust-analyzer.cargo.target": "thumbv7m-none-eabi",
+    "rust-analyzer.cargo.features": [
+        "stm32f103c8"
+    ],
     "rust-analyzer.checkOnSave.allTargets": false,
     "cortex-debug.registerUseNaturalFormat": false,
     "cortex-debug.variableUseNaturalFormat": false

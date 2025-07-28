@@ -12,18 +12,18 @@ packed_struct = { version = "0.10", default-features = false }
 crc16 = "0.4"
 
 stm32f1xx-hal = { version = "0.10.0", features = ["rt", ], optional = true }
+stm32f0xx-hal = { version = "0.18.0", features = ["rt"], optional = true }
 
 rtic = { version = "2.1", features = ["rtic-monotonics"] }
-#rtic-sync = { version = "1.0.2", features = ["defmt-03"] }
 
-usb-device = { version = "0.2.9", features = ["defmt", "control-buffer-256"] }
-usbd-hid = { version = "0.6", features = ["defmt"] }
+usb-device = { version = "0.2.9", features = ["control-buffer-256"] }
+usbd-hid = { version = "0.6" }
 usbd-hid-macros = "0.6"
 
-panic-probe = { version = "0.3", default-features = false }
+panic-probe = { version = "1", default-features = false }
 
-defmt = "0.3"
-defmt-rtt = "0.4"
+defmt = { version = "1", optional = true }
+defmt-rtt = { version = "1", optional = true }
 
 stm32-device-signature = "0.3.3"
 
@@ -45,12 +45,28 @@ lto = true
 
 
 [features]
-default = ["stm32f103c8"]
-
+# Select one of the following features to build for a specific target
 stm32f103c8 = ["stm32f103"]
+stm32f103cb = ["stm32f103"]
+stm32f072c8 = ["stm32f072"]
+
+defmt = [
+    "dep:defmt",
+    "dep:defmt-rtt",
+    "usb-device/defmt",
+    "usbd-hid/defmt",
+]
+
 stm32f103 = [
     "stm32f1xx-hal/stm32f103",
     "stm32f1xx-hal/medium",
     "stm32-device-signature/stm32f1",
     "rtic/thumbv7-backend",
+    "defmt",
+]
+
+stm32f072 = [
+    "stm32f0xx-hal/stm32f072",
+    "stm32-device-signature/stm32f0",
+    "rtic/thumbv6-backend",
 ]

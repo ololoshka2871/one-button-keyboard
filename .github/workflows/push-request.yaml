@@ -18,5 +18,8 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Build
-        run: cargo build --release
+      - name: Build F103
+        run: cargo build --release --target thumbv7m-none-eabi --features stm32f103c8
+
+      - name: Build F072
+        run: cargo build --release --target thumbv6m-none-eabi --features stm32f072c8
