@@ -1,8 +1,10 @@
+#[cfg(feature = "stm32f103")]
 pub const XTAL_FREQ: u32 = 8_000_000;
 
 //-----------------------------------------------------------------------------
 
 //usb pull up
+#[cfg(feature = "stm32f103")]
 pub const USB_PULLUP_ACTVE_LEVEL: Option<bool> = None;
 
 pub const USB_VID: u16 = 0x16c0;

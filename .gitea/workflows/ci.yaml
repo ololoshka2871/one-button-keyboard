@@ -14,15 +14,20 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Build
-        run: cargo build --release
+      - name: Build F103
+        run: cargo build --release --target thumbv7m-none-eabi --features stm32f103c8
+
+      - name: Build F072
+        run: cargo build --release --target thumbv6m-none-eabi --features stm32f072c8
 
       - name: Pack tools
         run: |
           tar -czf scripts.tar.gz -C scripts hid_code.py setup-key.py requirements.txt README.md
 
-      - name: Create binary dist
-        run: arm-none-eabi-objcopy -O binary target/thumbv7m-none-eabi/release/one-button-keyboard one-button-keyboard.bin
+      - name: Create binary dists
+        run: |
+          arm-none-eabi-objcopy -O binary target/thumbv7m-none-eabi/release/one-button-keyboard one-button-keyboard-f103.bin
+          arm-none-eabi-objcopy -O binary target/thumbv6m-none-eabi/release/one-button-keyboard one-button-keyboard-f072.bin
 
       - uses: SebRollen/toml-action@v1.2.0
         id: read_version
@@ -36,5 +41,6 @@ jobs:
           body: This is an automatic ${{ steps.read_version.outputs.value }} release!
           prerelease: true
           files: |
-            one-button-keyboard.bin
+            one-button-keyboard-f103.bin
+            one-button-keyboard-f072.bin
             scripts.tar.gz
