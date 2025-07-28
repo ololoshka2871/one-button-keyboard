@@ -1,7 +1,7 @@
 [package]
 authors = ["ololoshka2871"]
 name = "one-button-keyboard"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 
 [dependencies]
