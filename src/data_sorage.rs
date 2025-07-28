@@ -37,7 +37,8 @@ pub enum SettingsStoreError {
     PackingError(PackingError),
 }
 
-#[derive(PackedStruct, Clone, Default, defmt::Format)]
+#[derive(PackedStruct, Clone, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ReportPattern {
     #[packed_field(size_bytes = "1")]
     pub modifier: u8,
@@ -123,6 +124,7 @@ impl DataStorage {
                 };
             }
         } else {
+            #[cfg(feature = "defmt")]
             defmt::error!("CRC not match: {:#X}", crc);
         }
         let mut res = Self {
@@ -153,7 +155,7 @@ impl DataStorage {
         }
 
         let save_space =
-            (unsafe { SAVE_SPACE.assume_init_ref().as_ptr() as u32 } - FLASH_START) as u32;
+            (unsafe { SAVE_SPACE.assume_init_ref().as_ptr() as u32 } - FLASH_START as u32) as u32;
 
         #[cfg(any(feature = "stm32f103",))]
         {
@@ -189,10 +191,12 @@ impl DataStorage {
         {
             use embedded_storage::nor_flash::NorFlash;
 
+            let mut unlocked_flash = self.flash.unlocked();
+
             NorFlash::erase(&mut unlocked_flash, save_space, save_space + PAGE_SIZE)
                 .map_err(|e| SettingsStoreError::FlashError(e))?;
 
-            NorFlash::write(&mut unlocked_flash, save_space, &packed)
+           NorFlash::write(&mut unlocked_flash, save_space, &packed)
                 .map_err(|e| SettingsStoreError::FlashError(e))
         }
     }

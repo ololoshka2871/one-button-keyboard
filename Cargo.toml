@@ -6,13 +6,14 @@ edition = "2021"
 
 [dependencies]
 embedded-hal = { version = "0.2.7", features = ["unproven"] }
+embedded-storage = { version = "0.3.1", optional = true }
 cortex-m = { version = "0.7", features = ["critical-section-single-core", "inline-asm"] }
 cortex-m-rt = "0.7"
 packed_struct = { version = "0.10", default-features = false }
 crc16 = "0.4"
 
 stm32f1xx-hal = { version = "0.10.0", features = ["rt", ], optional = true }
-stm32f0xx-hal = { version = "0.18.0", features = ["rt"], optional = true }
+stm32f0xx-hal = { git = "https://github.com/stm32-rs/stm32f0xx-hal.git", rev = "8eda8641428e901c4987aca292a9c4c81f9ca63c", features = ["rt"], optional = true }
 
 rtic = { version = "2.1", features = ["rtic-monotonics"] }
 
@@ -67,6 +68,8 @@ stm32f103 = [
 
 stm32f072 = [
     "stm32f0xx-hal/stm32f072",
+    "stm32f0xx-hal/stm32-usbd",
     "stm32-device-signature/stm32f0",
     "rtic/thumbv6-backend",
+    "dep:embedded-storage",
 ]

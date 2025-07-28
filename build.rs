@@ -55,6 +55,14 @@ const FLASH_PAGE_SIZE: u32 = 2;
 #[cfg(any(feature = "stm32f103",))]
 const FLASH_PAGE_SIZE: u32 = 1;
 
+//-------------------------------------------------------------------------
+
+#[cfg(any(feature = "stm32f103",))]
+const RAM_SIZE_KB: u32 = 6;
+
+#[cfg(any(feature = "stm32f072",))]
+const RAM_SIZE_KB: u32 = 16;
+
 fn main() {
     if !cfg!(any(feature = "stm32f103c8", feature = "stm32f103cb", feature = "stm32f072c8")) {
         panic!("No target feature enabled. Please enable one of the features: stm32f103c8, stm32f103cb, stm32f072c8.");
@@ -89,7 +97,7 @@ SECTIONS {{
 "#,
                 flash_size = FLASH_SIZE,
                 flas_page_size = FLASH_PAGE_SIZE,
-                ram_size = 6,
+                ram_size = RAM_SIZE_KB,
             )
             .as_bytes(),
         )

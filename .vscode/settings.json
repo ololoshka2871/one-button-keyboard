@@ -4,9 +4,9 @@
     "lldb.dereferencePointers": true,
 
     // Убрать ошибку Can't find crate for 'test'
-    "rust-analyzer.cargo.target": "thumbv7m-none-eabi",
+    "rust-analyzer.cargo.target": "thumbv6m-none-eabi",
     "rust-analyzer.cargo.features": [
-        "stm32f103c8"
+        "stm32f072c8"
     ],
     "rust-analyzer.checkOnSave.allTargets": false,
     "cortex-debug.registerUseNaturalFormat": false,
